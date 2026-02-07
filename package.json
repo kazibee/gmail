@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "command": "./src/command.ts",
   "dependencies": {
+    "@googleapis/drive": "^8.16.0",
     "@googleapis/gmail": "^15.0.0"
   },
   "devDependencies": {

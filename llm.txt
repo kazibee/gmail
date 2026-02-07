@@ -8,12 +8,16 @@ Auth requirements
 - CLIENT_SECRET
 - REFRESH_TOKEN
 - If auth fails, instruct user to run: kazibee gmail login
+- For Drive-file attachments, login must include Drive readonly scope.
 
 Typical intents to map
 - "latest emails" -> list messages with max results and optional query
 - "read this email" -> get message by ID
 - "send email" -> send message with to/subject/body
-- "save draft" -> create draft
+- "send with local attachments" -> sendMessageWithAttachments(...)
+- "send with Google Drive file IDs" -> sendMessageWithDriveAttachments(...)
+- "save draft" -> createDraft or attachment-aware draft methods
+- "download attachment" -> listAttachments + downloadAttachment/downloadAttachmentPart
 - "labels" -> list labels, add/remove labels
 - "filters" -> list/create/delete filters
 
@@ -21,40 +25,55 @@ Examples
 - "List my 20 latest unread emails from the inbox."
 - "Find emails from billing@company.com in the last 7 days."
 - "Get message 18c7f0... and summarize it."
-- "Draft a reply to message 18c7f0... thanking them and asking for ETA."
-- "Send an email to alice@example.com with subject 'Project Update' and a short status body."
-- "Mark message 18c7f0... as read."
-- "Add label 'Important' to message 18c7f0..."
+- "Send this with files attached from /tmp."
+- "Send this with Drive files 1abc.. and 1def.. attached."
+- "Download all attachments from message 18c7f0..."
 
 Code call examples
 ```ts
 const msgs = await tools["gmail"].listMessages("is:unread in:inbox", 20);
 const msg = await tools["gmail"].getMessage("18c7f0abc123");
+
 const sent = await tools["gmail"].sendMessage(
   "alice@example.com",
   "Project Update",
   "Quick status: on track for Friday."
 );
-const sentHtml = await tools["gmail"].sendHtmlMessage(
-  "team@example.com",
+
+const sentWithLocalFiles = await tools["gmail"].sendMessageWithAttachments(
+  "ops@example.com",
   "Weekly Report",
-  "<h1>Weekly Report</h1><p>All systems green.</p>"
+  "See attachments.",
+  [
+    { path: "/tmp/report.pdf" },
+    { path: "/tmp/export.csv", filename: "metrics.csv", mimeType: "text/csv" }
+  ]
 );
-const reply = await tools["gmail"].replyToMessage(
+
+const sentWithDriveFiles = await tools["gmail"].sendMessageWithDriveAttachments(
+  "ops@example.com",
+  "Drive Attachments",
+  "Attached directly from Drive.",
+  [
+    { fileId: "1abcDriveFileId" },
+    { fileId: "1defDriveFileId", filename: "renamed.pdf" }
+  ]
+);
+
+const draftWithDrive = await tools["gmail"].createDraftWithDriveAttachments(
+  "ops@example.com",
+  "Draft With Drive Files",
+  "Please review.",
+  [{ fileId: "1abcDriveFileId" }]
+);
+
+const attachmentParts = await tools["gmail"].listAttachments("18c7f0abc123");
+await tools["gmail"].downloadAttachmentPart(
   "18c7f0abc123",
-  "Thanks, can you share ETA?"
+  attachmentParts[0].partId,
+  "/tmp/attachment.bin"
 );
-await tools["gmail"].trashMessage("18c7f0abc123");
-await tools["gmail"].untrashMessage("18c7f0abc123");
-const labels = await tools["gmail"].listLabels();
-await tools["gmail"].addLabels("18c7f0abc123", ["IMPORTANT"]);
-await tools["gmail"].removeLabels("18c7f0abc123", ["UNREAD"]);
-const draft = await tools["gmail"].createDraft(
-  "bob@example.com",
-  "Draft Subject",
-  "Draft body text"
-);
-const drafts = await tools["gmail"].listDrafts();
+
 const filters = await tools["gmail"].listFilters();
 const createdFilter = await tools["gmail"].createFilter(
   { from: "billing@company.com", hasAttachment: true },
@@ -67,3 +86,4 @@ Output behavior
 - Return concise structured results.
 - Include message IDs when listing messages so follow-up actions can target them.
 - On write actions, confirm success with the returned ID/state.
+- For attachment operations, include filenames/IDs and output paths.

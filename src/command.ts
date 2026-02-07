@@ -6,6 +6,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.settings.basic',
+  'https://www.googleapis.com/auth/drive.readonly',
 ];
 const REDIRECT_PORT = 3848;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}`;
