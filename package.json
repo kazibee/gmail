@@ -1,0 +1,13 @@
+{
+  "name": "@kazibee/gmail",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "command": "./src/command.ts",
+  "dependencies": {
+    "@googleapis/gmail": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.8"
+  }
+}
