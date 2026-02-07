@@ -1,13 +1,13 @@
 import { gmail as createGmail, type gmail_v1 } from '@googleapis/gmail';
 import { drive as createDrive, type drive_v3 } from '@googleapis/drive';
-import type { OAuth2Client } from 'google-auth-library';
+import { Readable } from 'node:stream';
 
 type GmailAPI = gmail_v1.Gmail;
 type DriveAPI = drive_v3.Drive;
 
-export function createGmailClient(auth: OAuth2Client) {
-  const api = createGmail({ version: 'v1', auth });
-  const drive = createDrive({ version: 'v3', auth });
+export function createGmailClient(auth: unknown) {
+  const api = createGmail({ version: 'v1', auth: auth as any });
+  const drive = createDrive({ version: 'v3', auth: auth as any });
 
   return {
     listMessages: (query?: string, maxResults?: number) =>
@@ -725,7 +725,7 @@ async function readDriveAttachmentPayloads(
       attachment.mimeType ||
       metaRes.data.mimeType ||
       inferMimeTypeFromFilename(filename);
-    const base64Data = Buffer.from(contentRes.data as ArrayBuffer).toString('base64');
+    const base64Data = (await toBuffer(contentRes.data)).toString('base64');
 
     payloads.push({ filename, mimeType, base64Data });
   }
@@ -735,4 +735,28 @@ async function readDriveAttachmentPayloads(
 
 function sanitizeHeaderValue(value: string): string {
   return value.replace(/[\r\n"]/g, '_');
+}
+
+async function toBuffer(data: unknown): Promise<Buffer> {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === 'string') {
+    return Buffer.from(data);
+  }
+  if (data instanceof Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of data) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  throw new Error(`Unsupported drive content payload type: ${typeof data}`);
 }
