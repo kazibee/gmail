@@ -5,6 +5,11 @@ import { Readable } from 'node:stream';
 type GmailAPI = gmail_v1.Gmail;
 type DriveAPI = drive_v3.Drive;
 
+/**
+ * Creates the Gmail tool client using a shared OAuth auth instance.
+ *
+ * The returned object contains message, draft, label, filter, and attachment helpers.
+ */
 export function createGmailClient(auth: unknown) {
   const api = createGmail({ version: 'v1', auth: auth as any });
   const drive = createDrive({ version: 'v3', auth: auth as any });
@@ -103,23 +108,37 @@ export interface SentMessage {
   labelIds: string[];
 }
 
+/** Local filesystem attachment input for send/draft APIs. */
 export interface SendAttachmentInput {
+  /** Local path to file to attach. */
   path: string;
+  /** Optional filename override shown in email. */
   filename?: string;
+  /** Optional MIME type override for the attachment. */
   mimeType?: string;
 }
 
+/** Google Drive attachment input for send/draft APIs. */
 export interface DriveAttachmentInput {
+  /** Drive file ID to fetch and attach. */
   fileId: string;
+  /** Optional filename override shown in email. */
   filename?: string;
+  /** Optional MIME type override for the attachment. */
   mimeType?: string;
 }
 
+/** Attachment metadata extracted from a message payload. */
 export interface AttachmentSummary {
+  /** Gmail message part ID. */
   partId: string;
+  /** Gmail attachment ID when body is externalized. */
   attachmentId?: string;
+  /** Attachment filename (may be empty for inline data). */
   filename: string;
+  /** Attachment MIME type. */
   mimeType: string;
+  /** Attachment size in bytes as reported by Gmail. */
   size: number;
 }
 
@@ -221,6 +240,7 @@ async function sendMessageWithDriveAttachments(
   body: string,
   attachments: DriveAttachmentInput[],
 ): Promise<SentMessage> {
+  // Fetch Drive files as binary payloads, then attach as MIME parts.
   const payloads = await readDriveAttachmentPayloads(drive, attachments);
   const raw = buildRawEmailWithAttachments(to, subject, body, payloads);
   const res = await api.users.messages.send({
@@ -348,6 +368,7 @@ async function createDraftWithDriveAttachments(
   body: string,
   attachments: DriveAttachmentInput[],
 ): Promise<DraftSummary> {
+  // Fetch Drive files as binary payloads, then attach as MIME parts.
   const payloads = await readDriveAttachmentPayloads(drive, attachments);
   const raw = buildRawEmailWithAttachments(to, subject, body, payloads);
   const res = await api.users.drafts.create({
