@@ -26,6 +26,10 @@ export function createGmailClient(auth: OAuth2Client) {
     createDraft: (to: string, subject: string, body: string) =>
       createDraft(api, to, subject, body),
     listDrafts: () => listDrafts(api),
+    listFilters: () => listFilters(api),
+    createFilter: (criteria: FilterCriteria, action: FilterAction) =>
+      createFilter(api, criteria, action),
+    deleteFilter: (filterId: string) => deleteFilter(api, filterId),
   };
 }
 
@@ -65,6 +69,30 @@ export interface SentMessage {
   id: string;
   threadId: string;
   labelIds: string[];
+}
+
+export interface FilterCriteria {
+  from?: string;
+  to?: string;
+  subject?: string;
+  query?: string;
+  negatedQuery?: string;
+  hasAttachment?: boolean;
+  excludeChats?: boolean;
+  size?: number;
+  sizeComparison?: 'larger' | 'smaller';
+}
+
+export interface FilterAction {
+  addLabelIds?: string[];
+  removeLabelIds?: string[];
+  forward?: string;
+}
+
+export interface GmailFilter {
+  id: string;
+  criteria: FilterCriteria;
+  action: FilterAction;
 }
 
 // -- List / Get --
@@ -210,6 +238,35 @@ async function listDrafts(api: GmailAPI): Promise<DraftSummary[]> {
   }));
 }
 
+// -- Filters --
+
+async function listFilters(api: GmailAPI): Promise<GmailFilter[]> {
+  const res = await api.users.settings.filters.list({ userId: 'me' });
+  return (res.data.filter ?? []).map(mapFilter);
+}
+
+async function createFilter(
+  api: GmailAPI,
+  criteria: FilterCriteria,
+  action: FilterAction,
+): Promise<GmailFilter> {
+  const res = await api.users.settings.filters.create({
+    userId: 'me',
+    requestBody: {
+      criteria: mapFilterCriteria(criteria),
+      action: mapFilterAction(action),
+    },
+  });
+  return mapFilter(res.data);
+}
+
+async function deleteFilter(api: GmailAPI, filterId: string): Promise<void> {
+  await api.users.settings.filters.delete({
+    userId: 'me',
+    id: filterId,
+  });
+}
+
 // -- Helpers --
 
 function buildRawEmail(
@@ -288,5 +345,58 @@ function mapSentMessage(data: gmail_v1.Schema$Message): SentMessage {
     id: data.id!,
     threadId: data.threadId!,
     labelIds: data.labelIds ?? [],
+  };
+}
+
+function mapFilter(data: gmail_v1.Schema$Filter): GmailFilter {
+  const criteria = data.criteria;
+  const action = data.action;
+  const sizeComparison =
+    criteria?.sizeComparison === 'larger' || criteria?.sizeComparison === 'smaller'
+      ? criteria.sizeComparison
+      : undefined;
+
+  return {
+    id: data.id ?? '',
+    criteria: {
+      from: criteria?.from ?? undefined,
+      to: criteria?.to ?? undefined,
+      subject: criteria?.subject ?? undefined,
+      query: criteria?.query ?? undefined,
+      negatedQuery: criteria?.negatedQuery ?? undefined,
+      hasAttachment: criteria?.hasAttachment ?? undefined,
+      excludeChats: criteria?.excludeChats ?? undefined,
+      size: criteria?.size ?? undefined,
+      sizeComparison,
+    },
+    action: {
+      addLabelIds: action?.addLabelIds ?? undefined,
+      removeLabelIds: action?.removeLabelIds ?? undefined,
+      forward: action?.forward ?? undefined,
+    },
+  };
+}
+
+function mapFilterCriteria(
+  criteria: FilterCriteria,
+): gmail_v1.Schema$FilterCriteria {
+  return {
+    from: criteria.from,
+    to: criteria.to,
+    subject: criteria.subject,
+    query: criteria.query,
+    negatedQuery: criteria.negatedQuery,
+    hasAttachment: criteria.hasAttachment,
+    excludeChats: criteria.excludeChats,
+    size: criteria.size,
+    sizeComparison: criteria.sizeComparison,
+  };
+}
+
+function mapFilterAction(action: FilterAction): gmail_v1.Schema$FilterAction {
+  return {
+    addLabelIds: action.addLabelIds,
+    removeLabelIds: action.removeLabelIds,
+    forward: action.forward,
   };
 }
