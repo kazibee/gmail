@@ -28,6 +28,7 @@ Notes:
 
 ### Messages
 - `listMessages(query?, maxResults?)`
+- `listMessageSummaries(query?, maxResults?)`
 - `getMessage(messageId)`
 - `sendMessage(to, subject, body)`
 - `sendHtmlMessage(to, subject, htmlBody)`
@@ -61,6 +62,16 @@ Notes:
 ## Usage
 
 ```javascript
+// Fast ID-only listing (good for follow-up actions by ID)
+const refs = await tools["gmail"].listMessages("is:unread in:inbox", 20);
+
+// Rich inbox preview listing
+const previews = await tools["gmail"].listMessageSummaries("is:unread in:inbox", 20);
+// previews[0] -> { id, threadId, from, subject, date, snippet }
+
+// For most user-facing "get my emails" style requests, prefer listMessageSummaries.
+// Use listMessages when you specifically want reference IDs quickly.
+
 // Send with local file attachments
 await tools["gmail"].sendMessageWithAttachments(
   "ops@example.com",

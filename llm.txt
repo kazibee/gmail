@@ -11,7 +11,8 @@ Auth requirements
 - For Drive-file attachments, login must include Drive readonly scope.
 
 Typical intents to map
-- "latest emails" -> list messages with max results and optional query
+- "latest emails" -> listMessageSummaries(...) with max results and optional query
+- "get my emails" -> listMessageSummaries(...) with a sensible maxResults (for example 20)
 - "read this email" -> get message by ID
 - "send email" -> send message with to/subject/body
 - "send with local attachments" -> sendMessageWithAttachments(...)
@@ -32,6 +33,7 @@ Examples
 Code call examples
 ```ts
 const msgs = await tools["gmail"].listMessages("is:unread in:inbox", 20);
+const summaries = await tools["gmail"].listMessageSummaries("is:unread in:inbox", 20);
 const msg = await tools["gmail"].getMessage("18c7f0abc123");
 
 const sent = await tools["gmail"].sendMessage(
@@ -84,6 +86,8 @@ await tools["gmail"].deleteFilter(createdFilter.id);
 
 Output behavior
 - Return concise structured results.
+- For generic list intents (e.g. "get my emails"), default to `listMessageSummaries`.
+- Use `listMessages` only when the user explicitly wants IDs-only or a faster reference-only listing.
 - Include message IDs when listing messages so follow-up actions can target them.
 - On write actions, confirm success with the returned ID/state.
 - For attachment operations, include filenames/IDs and output paths.

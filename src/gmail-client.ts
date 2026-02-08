@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 
 type GmailAPI = gmail_v1.Gmail;
 type DriveAPI = drive_v3.Drive;
+const LIST_SUMMARY_BATCH_SIZE = 5;
 
 /**
  * Creates the Gmail tool client using a shared OAuth auth instance.
@@ -17,6 +18,8 @@ export function createGmailClient(auth: unknown) {
   return {
     listMessages: (query?: string, maxResults?: number) =>
       listMessages(api, query, maxResults),
+    listMessageSummaries: (query?: string, maxResults?: number) =>
+      listMessageSummaries(api, query, maxResults),
     getMessage: (messageId: string) => getMessage(api, messageId),
     sendMessage: (to: string, subject: string, body: string) =>
       sendMessage(api, to, subject, body),
@@ -75,6 +78,15 @@ export function createGmailClient(auth: unknown) {
 export interface MessageSummary {
   id: string;
   threadId: string;
+  snippet: string;
+}
+
+export interface MessageListSummary {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  date: string;
   snippet: string;
 }
 
@@ -187,8 +199,70 @@ async function listMessages(
   return (res.data.messages ?? []).map((m) => ({
     id: m.id!,
     threadId: m.threadId!,
-    snippet: '',
+    snippet: m.snippet ?? '',
   }));
+}
+
+async function listMessageSummaries(
+  api: GmailAPI,
+  query?: string,
+  maxResults = 20,
+): Promise<MessageListSummary[]> {
+  const res = await api.users.messages.list({
+    userId: 'me',
+    q: query,
+    maxResults,
+  });
+
+  const refs = (res.data.messages ?? []).filter(
+    (message): message is gmail_v1.Schema$Message & { id: string } => !!message.id,
+  );
+  const summaries: MessageListSummary[] = [];
+
+  for (let i = 0; i < refs.length; i += LIST_SUMMARY_BATCH_SIZE) {
+    const batch = refs.slice(i, i + LIST_SUMMARY_BATCH_SIZE);
+    const batchSummaries = await Promise.all(
+      batch.map(async (ref) => {
+        const detail = await api.users.messages.get({
+          userId: 'me',
+          id: ref.id,
+          format: 'metadata',
+          metadataHeaders: ['From', 'Subject', 'Date'],
+        });
+
+        const headers = detail.data.payload?.headers;
+        return {
+          id: detail.data.id ?? ref.id,
+          threadId: detail.data.threadId ?? ref.threadId ?? '',
+          from: getHeaderValue(headers, 'From'),
+          subject: getHeaderValue(headers, 'Subject'),
+          date: getHeaderValue(headers, 'Date'),
+          snippet: detail.data.snippet ?? ref.snippet ?? '',
+        };
+      }),
+    );
+
+    summaries.push(...batchSummaries);
+  }
+
+  return summaries;
+}
+
+function getHeaderValue(
+  headers: gmail_v1.Schema$MessagePartHeader[] | undefined,
+  name: string,
+): string {
+  return headers?.find((header) => header.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
+}
+
+function mapMessageHeaders(data: gmail_v1.Schema$Message): Pick<Message, 'from' | 'to' | 'subject' | 'date'> {
+  const headers = data.payload?.headers;
+  return {
+    from: getHeaderValue(headers, 'From'),
+    to: getHeaderValue(headers, 'To'),
+    subject: getHeaderValue(headers, 'Subject'),
+    date: getHeaderValue(headers, 'Date'),
+  };
 }
 
 async function getMessage(api: GmailAPI, messageId: string): Promise<Message> {
@@ -559,18 +633,16 @@ function buildRawEmailWithAttachments(
 }
 
 function mapMessage(data: gmail_v1.Schema$Message): Message {
-  const headers = data.payload?.headers ?? [];
-  const getHeader = (name: string) =>
-    headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
+  const headerValues = mapMessageHeaders(data);
 
   return {
     id: data.id!,
     threadId: data.threadId!,
     snippet: data.snippet ?? '',
-    from: getHeader('From'),
-    to: getHeader('To'),
-    subject: getHeader('Subject'),
-    date: getHeader('Date'),
+    from: headerValues.from,
+    to: headerValues.to,
+    subject: headerValues.subject,
+    date: headerValues.date,
     body: extractBody(data.payload),
     labelIds: data.labelIds ?? [],
   };

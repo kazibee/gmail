@@ -4,6 +4,7 @@ import { createGmailClient } from './gmail-client';
 export type { Env } from './auth';
 export type {
   MessageSummary,
+  MessageListSummary,
   Message,
   Label,
   DraftSummary,
