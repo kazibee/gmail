@@ -1,7 +1,9 @@
 Tool: gmail
 Package: @kazibee/gmail
 
-Use this tool for Gmail operations. Prefer precise calls with explicit limits, query filters, and message IDs.
+Use this tool for Gmail operations. Prefer precise calls with explicit limits and query filters.
+Use message IDs internally for follow-up actions, but keep user-facing output human-friendly by default.
+Default to user-friendly summary outputs unless the user explicitly asks for IDs-only behavior.
 
 Auth requirements
 - CLIENT_ID
@@ -11,8 +13,8 @@ Auth requirements
 - For Drive-file attachments, login must include Drive readonly scope.
 
 Typical intents to map
-- "latest emails" -> listMessageSummaries(...) with max results and optional query
-- "get my emails" -> listMessageSummaries(...) with a sensible maxResults (for example 20)
+- "latest emails" -> listMessageSummaries(...) with maxResults and optional query
+- "get my emails" -> listMessageSummaries(...) with sensible maxResults (default 20)
 - "read this email" -> get message by ID
 - "send email" -> send message with to/subject/body
 - "send with local attachments" -> sendMessageWithAttachments(...)
@@ -21,6 +23,22 @@ Typical intents to map
 - "download attachment" -> listAttachments + downloadAttachment/downloadAttachmentPart
 - "labels" -> list labels, add/remove labels
 - "filters" -> list/create/delete filters
+
+Method selection policy
+- For generic list intents, use listMessageSummaries(query?, maxResults?).
+- Use listMessages(query?, maxResults?) only when user explicitly asks for IDs-only output or fastest reference listing.
+- Use getMessage(messageId) when the user asks to read, summarize, or inspect one specific message.
+
+Tool-use flow
+- Step 1: Resolve intent as list, single-message read, send/reply, draft, labels, filters, or attachments.
+- Step 2: Choose the narrowest method that satisfies the request.
+- Step 3: Format output for readability first; expose IDs only when requested or necessary for next actions.
+
+Defaults and limits
+- If user gives no count, use maxResults = 20.
+- If user asks for "all emails", ask for a limit or use a safe cap (for example 50) and say results are limited.
+- Preserve user-provided filters exactly when possible (from:, subject:, is:unread, in:inbox, newer_than:, etc).
+- For date-relative requests ("last 7 days"), prefer query syntax like newer_than:7d.
 
 Examples
 - "List my 20 latest unread emails from the inbox."
@@ -32,8 +50,8 @@ Examples
 
 Code call examples
 ```ts
-const msgs = await tools["gmail"].listMessages("is:unread in:inbox", 20);
 const summaries = await tools["gmail"].listMessageSummaries("is:unread in:inbox", 20);
+const refs = await tools["gmail"].listMessages("is:unread in:inbox", 20); // IDs-only fast path
 const msg = await tools["gmail"].getMessage("18c7f0abc123");
 
 const sent = await tools["gmail"].sendMessage(
@@ -88,6 +106,11 @@ Output behavior
 - Return concise structured results.
 - For generic list intents (e.g. "get my emails"), default to `listMessageSummaries`.
 - Use `listMessages` only when the user explicitly wants IDs-only or a faster reference-only listing.
-- Include message IDs when listing messages so follow-up actions can target them.
+- Do not show internal message IDs in user-facing output by default.
+- Show message IDs only when user asks for IDs explicitly or when an immediate follow-up action requires selecting a specific message.
+- For list outputs, prefer a clean numbered view (from, subject, date, snippet) without IDs.
+- Summary list payload fields available: id, threadId, from, subject, date, snippet.
+- For "read/summarize this email" requests, return the message content summary, not raw metadata dumps.
 - On write actions, confirm success with the returned ID/state.
 - For attachment operations, include filenames/IDs and output paths.
+- On auth errors, tell user to run: `kazibee gmail login`.
