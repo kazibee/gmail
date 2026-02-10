@@ -11,11 +11,6 @@ const SCOPES = [
 const REDIRECT_PORT = 3848;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}`;
 
-// Bundled OAuth app credentials — these belong to the tool, not the user.
-// The user only needs to authorize via the browser to get a refresh token.
-const CLIENT_ID = '258815534555-4uujer1icm690suaa8p46c64s4ric9h4.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
-
 export interface LoginResult {
   CLIENT_ID: string;
   CLIENT_SECRET: string;
@@ -31,7 +26,8 @@ export interface LoginResult {
  * 4. Exchanges for refresh + access tokens
  * 5. Returns the credentials for storage via kazibee tool env
  */
-export async function login(): Promise<LoginResult> {
+export async function login(env: Record<string, string>): Promise<LoginResult> {
+  const { CLIENT_ID, CLIENT_SECRET } = env;
   const oauth2 = new googleAuth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
   const authUrl = oauth2.generateAuthUrl({
