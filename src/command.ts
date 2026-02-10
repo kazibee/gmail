@@ -26,8 +26,41 @@ export interface LoginResult {
  * 4. Exchanges for refresh + access tokens
  * 5. Returns the credentials for storage via kazibee tool env
  */
-export async function login(env: Record<string, string>): Promise<LoginResult> {
-  const { CLIENT_ID, CLIENT_SECRET } = env;
+export async function login(env: Record<string, string>, ...args: string[]): Promise<LoginResult> {
+  // Check for --help flag
+  if (args.includes('--help')) {
+    console.log([
+      '',
+      `Usage: kazibee <tool-name> login [CLIENT_ID CLIENT_SECRET]`,
+      '',
+      'Runs the OAuth2 browser login flow to obtain a refresh token.',
+      '',
+      'Steps:',
+      `  1. Starts a temporary local HTTP server on port ${REDIRECT_PORT}`,
+      '  2. Opens your browser to Google\'s OAuth consent screen',
+      '  3. After you authorize, receives the auth code via redirect',
+      '  4. Exchanges the code for a refresh token',
+      '  5. Stores CLIENT_ID, CLIENT_SECRET, and REFRESH_TOKEN as tool env vars',
+      '',
+      'Options:',
+      '  CLIENT_ID CLIENT_SECRET   Use custom OAuth app credentials instead of defaults',
+      '  --help                    Show this help message',
+      '',
+    ].join('\n'));
+    return {} as LoginResult;
+  }
+
+  // CLI args override env values
+  const CLIENT_ID = args[0] || env.CLIENT_ID;
+  const CLIENT_SECRET = args[1] || env.CLIENT_SECRET;
+
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error(
+      'Missing CLIENT_ID or CLIENT_SECRET. Provide them as arguments or ensure they are set in the system env.\n' +
+      'Usage: kazibee <tool-name> login [CLIENT_ID CLIENT_SECRET]'
+    );
+  }
+
   const oauth2 = new googleAuth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
   const authUrl = oauth2.generateAuthUrl({
