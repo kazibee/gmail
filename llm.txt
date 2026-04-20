@@ -17,6 +17,7 @@ Typical intents to map
 - "get my emails" -> listMessageSummaries(...) with sensible maxResults (default 20)
 - "read this email" -> get message by ID
 - "send email" -> send message with to/subject/body
+- "reply to email" / "respond to this" -> replyToMessage(messageId, body) — keeps reply in the same thread
 - "send with local attachments" -> sendMessageWithAttachments(...)
 - "send with Google Drive file IDs" -> sendMessageWithDriveAttachments(...)
 - "save draft" -> createDraft or attachment-aware draft methods
@@ -28,6 +29,7 @@ Method selection policy
 - For generic list intents, use listMessageSummaries(query?, maxResults?).
 - Use listMessages(query?, maxResults?) only when user explicitly asks for IDs-only output or fastest reference listing.
 - Use getMessage(messageId) when the user asks to read, summarize, or inspect one specific message.
+- Use replyToMessage(messageId, body) when the user wants to reply to a specific message. The reply is kept in the same thread automatically (sets threadId, In-Reply-To, and References headers).
 
 Tool-use flow
 - Step 1: Resolve intent as list, single-message read, send/reply, draft, labels, filters, or attachments.
@@ -44,6 +46,7 @@ Examples
 - "List my 20 latest unread emails from the inbox."
 - "Find emails from billing@company.com in the last 7 days."
 - "Get message 18c7f0... and summarize it."
+- "Reply to that email saying I'll be there."
 - "Send this with files attached from /tmp."
 - "Send this with Drive files 1abc.. and 1def.. attached."
 - "Download all attachments from message 18c7f0..."
@@ -58,6 +61,12 @@ const sent = await tools["gmail"].sendMessage(
   "alice@example.com",
   "Project Update",
   "Quick status: on track for Friday."
+);
+
+// Reply to a message — stays in the same thread automatically
+const reply = await tools["gmail"].replyToMessage(
+  "18c7f0abc123",
+  "Thanks, I'll review this by EOD."
 );
 
 const sentWithLocalFiles = await tools["gmail"].sendMessageWithAttachments(

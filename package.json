@@ -4,6 +4,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "command": "./src/command.ts",
+  "kazibee": {
+    "description": "Send, receive, and manage Gmail messages, drafts, labels, filters, and attachments."
+  },
   "dependencies": {
     "@googleapis/drive": "^8.16.0",
     "@googleapis/gmail": "^15.0.0"
